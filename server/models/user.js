@@ -1,34 +1,20 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
-require("dotenv").config();
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true, maxlength: 80 },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true, minlength: 8, select: false },
+  role: { type: String, enum: ["user", "admin"], default: "user" },
+}, { timestamps: true });
 
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.json({
-        message: "StudentMart API is running"
-    });
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
-mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log("MongoDB connected");
+userSchema.methods.comparePassword = function (candidate) {
+  return bcrypt.compare(candidate, this.password);
+};
 
-        app.listen(process.env.PORT, () => {
-            console.log(
-                `Server running on http://localhost:${process.env.PORT}`
-            );
-        });
-    })
-    .catch((error) => {
-        console.error(
-            "MongoDB connection failed:",
-            error.message
-        );
-    });
+export default mongoose.model("User", userSchema);
